@@ -1,0 +1,5 @@
+{
+  "name": "MemoryFlow",
+  "description": "一个基于 FSRS v4 算法的无限层级递归间隔重复学习规划器。",
+  "requestFramePermissions": []
+}
