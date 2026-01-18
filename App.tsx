@@ -10,16 +10,14 @@ import {
   Check,
   Trash2,
   Calendar,
-  SkipForward,
   Printer
 } from 'lucide-react';
-import { Node, Rating } from './types';
-import { computeNextSchedule, formatTime } from './fsrs';
+import { Node } from './types';
 import { useTree, TreeContext } from './hooks/useTree';
 import { RecursiveTreeView } from './components/Tree';
-import { RatingButton } from './components/RatingButtons';
 import { CalendarView } from './components/CalendarView';
 import { PrintPlanModal } from './components/PrintPlanModal';
+import { ReviewDeck } from './components/ReviewDeck';
 
 // ----------------------
 // MAIN COMPONENT
@@ -199,10 +197,10 @@ export default function App() {
           )}
           
           {activeView === 'review' && (
-            <ReviewSession 
+            <ReviewDeck 
               queue={reviewQueue} 
               onExit={() => setActiveView('dashboard')}
-              reviewComplete={treeLogic.reviewComplete}
+              onReviewComplete={treeLogic.reviewComplete}
             />
           )}
 
@@ -301,132 +299,6 @@ function Dashboard({ totalNodes, reviewCount, onReviewClick }: any) {
           <h3 className="text-lg font-semibold text-gray-700 mb-4">知识库总览</h3>
           <div className="text-4xl font-bold text-slate-900 mb-2">{totalNodes}</div>
           <p className="text-sm text-gray-500">无限层级树中存储的节点总数。</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ReviewSession({ queue, onExit, reviewComplete }: any) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
-
-  // If queue finished
-  if (currentIndex >= queue.length) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full bg-white text-center p-8 animate-in fade-in duration-500">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600">
-          <ListTodo size={40} />
-        </div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">本轮复习完成！</h2>
-        <p className="text-gray-500 mb-8 max-w-md">
-          您已完成所有待复习项目。保持这种流畅的状态！
-        </p>
-        <button 
-          onClick={onExit}
-          className="px-8 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all"
-        >
-          返回首页
-        </button>
-      </div>
-    );
-  }
-
-  const currentNode = queue[currentIndex];
-  
-  // Calculate potential schedules for buttons
-  const ratings: Rating[] = [1, 2, 3, 4];
-  const schedules = ratings.map(r => computeNextSchedule(currentNode.fsrs, r, Date.now()));
-
-  const handleRate = (rating: Rating, schedule: any) => {
-    reviewComplete(currentNode.id, schedule.s, schedule.d, schedule.interval, rating);
-    setShowAnswer(false);
-    setCurrentIndex(prev => prev + 1);
-  };
-
-  const handleSkip = () => {
-    setShowAnswer(false);
-    setCurrentIndex(prev => prev + 1);
-  };
-
-  return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Top Bar */}
-      <div className="px-6 py-4 flex justify-between items-center text-sm text-gray-500 bg-white border-b border-gray-200">
-        <button onClick={onExit} className="hover:text-gray-800">退出</button>
-        <div className="font-mono">
-          {currentIndex + 1} / {queue.length}
-        </div>
-      </div>
-
-      {/* Card Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col min-h-[400px]">
-          
-          {/* Question / Topic */}
-          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-            <h3 className="text-gray-400 text-sm uppercase tracking-widest font-semibold mb-6">当前任务</h3>
-            <h1 className="text-3xl font-bold text-slate-800 leading-tight">
-              {currentNode.title}
-            </h1>
-          </div>
-
-          {/* Reveal / Action Area */}
-          <div className="bg-gray-50 border-t border-gray-100 p-8">
-            {!showAnswer ? (
-              <div className="flex gap-4">
-                  <button 
-                    onClick={handleSkip}
-                    className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-xl font-semibold text-lg hover:bg-gray-200 hover:text-gray-700 transition-all flex items-center justify-center gap-2"
-                  >
-                    <SkipForward size={20} />
-                    <span>暂不复习</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowAnswer(true)}
-                    className="flex-[2] py-4 bg-indigo-600 text-white rounded-xl font-semibold text-lg hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all"
-                  >
-                    完成复习 (显示评分)
-                  </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-4 gap-4">
-                    <RatingButton 
-                    label="重来" 
-                    time={formatTime(schedules[0].interval)} 
-                    color="bg-rose-100 text-rose-700 hover:bg-rose-200"
-                    onClick={() => handleRate(1, schedules[0])}
-                    />
-                    <RatingButton 
-                    label="困难" 
-                    time={formatTime(schedules[1].interval)} 
-                    color="bg-orange-100 text-orange-700 hover:bg-orange-200"
-                    onClick={() => handleRate(2, schedules[1])}
-                    />
-                    <RatingButton 
-                    label="良好" 
-                    time={formatTime(schedules[2].interval)} 
-                    color="bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                    onClick={() => handleRate(3, schedules[2])}
-                    />
-                    <RatingButton 
-                    label="简单" 
-                    time={formatTime(schedules[3].interval)} 
-                    color="bg-sky-100 text-sky-700 hover:bg-sky-200"
-                    onClick={() => handleRate(4, schedules[3])}
-                    />
-                </div>
-                <button 
-                    onClick={handleSkip}
-                    className="w-full py-2 text-sm text-gray-400 font-medium hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <SkipForward size={14} />
-                    <span>暂不复习 (跳过)</span>
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
