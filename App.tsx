@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
@@ -8,7 +9,9 @@ import {
   X,
   Check,
   Trash2,
-  Calendar
+  Calendar,
+  SkipForward,
+  Printer
 } from 'lucide-react';
 import { Node, Rating } from './types';
 import { computeNextSchedule, formatTime } from './fsrs';
@@ -16,6 +19,7 @@ import { useTree, TreeContext } from './hooks/useTree';
 import { RecursiveTreeView } from './components/Tree';
 import { RatingButton } from './components/RatingButtons';
 import { CalendarView } from './components/CalendarView';
+import { PrintPlanModal } from './components/PrintPlanModal';
 
 // ----------------------
 // MAIN COMPONENT
@@ -29,6 +33,7 @@ export default function App() {
 
   const [activeView, setActiveView] = useState<ViewMode>('dashboard');
   const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   
   // State for creating new subject via Sidebar
   const [isAddingSubject, setIsAddingSubject] = useState(false);
@@ -65,6 +70,15 @@ export default function App() {
   return (
     <TreeContext.Provider value={treeLogic}>
       <div className="flex h-screen bg-gray-50 text-slate-800 font-sans">
+        
+        {/* Modal Portal */}
+        {showPrintModal && (
+            <PrintPlanModal 
+                nodes={nodes} 
+                onClose={() => setShowPrintModal(false)} 
+            />
+        )}
+
         {/* Sidebar */}
         <aside className="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
           <div className="p-6">
@@ -94,6 +108,12 @@ export default function App() {
               label="日程预测" 
               isActive={activeView === 'calendar'}
               onClick={() => setActiveView('calendar')}
+            />
+            <SidebarItem 
+              icon={<Printer size={18} />} 
+              label="打印计划" 
+              isActive={false} // Always false as it triggers modal
+              onClick={() => setShowPrintModal(true)}
             />
 
             <div className="mt-8 mb-2 px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -316,10 +336,15 @@ function ReviewSession({ queue, onExit, reviewComplete }: any) {
   
   // Calculate potential schedules for buttons
   const ratings: Rating[] = [1, 2, 3, 4];
-  const schedules = ratings.map(r => computeNextSchedule(currentNode.fsrs, r));
+  const schedules = ratings.map(r => computeNextSchedule(currentNode.fsrs, r, Date.now()));
 
   const handleRate = (rating: Rating, schedule: any) => {
     reviewComplete(currentNode.id, schedule.s, schedule.d, schedule.interval, rating);
+    setShowAnswer(false);
+    setCurrentIndex(prev => prev + 1);
+  };
+
+  const handleSkip = () => {
     setShowAnswer(false);
     setCurrentIndex(prev => prev + 1);
   };
@@ -349,38 +374,56 @@ function ReviewSession({ queue, onExit, reviewComplete }: any) {
           {/* Reveal / Action Area */}
           <div className="bg-gray-50 border-t border-gray-100 p-8">
             {!showAnswer ? (
-              <button 
-                onClick={() => setShowAnswer(true)}
-                className="w-full py-4 bg-indigo-600 text-white rounded-xl font-semibold text-lg hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all"
-              >
-                完成复习 (显示评分)
-              </button>
+              <div className="flex gap-4">
+                  <button 
+                    onClick={handleSkip}
+                    className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-xl font-semibold text-lg hover:bg-gray-200 hover:text-gray-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <SkipForward size={20} />
+                    <span>暂不复习</span>
+                  </button>
+                  <button 
+                    onClick={() => setShowAnswer(true)}
+                    className="flex-[2] py-4 bg-indigo-600 text-white rounded-xl font-semibold text-lg hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all"
+                  >
+                    完成复习 (显示评分)
+                  </button>
+              </div>
             ) : (
-              <div className="grid grid-cols-4 gap-4">
-                <RatingButton 
-                  label="重来" 
-                  time={formatTime(schedules[0].interval)} 
-                  color="bg-rose-100 text-rose-700 hover:bg-rose-200"
-                  onClick={() => handleRate(1, schedules[0])}
-                />
-                <RatingButton 
-                  label="困难" 
-                  time={formatTime(schedules[1].interval)} 
-                  color="bg-orange-100 text-orange-700 hover:bg-orange-200"
-                  onClick={() => handleRate(2, schedules[1])}
-                />
-                <RatingButton 
-                  label="良好" 
-                  time={formatTime(schedules[2].interval)} 
-                  color="bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                  onClick={() => handleRate(3, schedules[2])}
-                />
-                <RatingButton 
-                  label="简单" 
-                  time={formatTime(schedules[3].interval)} 
-                  color="bg-sky-100 text-sky-700 hover:bg-sky-200"
-                  onClick={() => handleRate(4, schedules[3])}
-                />
+              <div className="space-y-4">
+                <div className="grid grid-cols-4 gap-4">
+                    <RatingButton 
+                    label="重来" 
+                    time={formatTime(schedules[0].interval)} 
+                    color="bg-rose-100 text-rose-700 hover:bg-rose-200"
+                    onClick={() => handleRate(1, schedules[0])}
+                    />
+                    <RatingButton 
+                    label="困难" 
+                    time={formatTime(schedules[1].interval)} 
+                    color="bg-orange-100 text-orange-700 hover:bg-orange-200"
+                    onClick={() => handleRate(2, schedules[1])}
+                    />
+                    <RatingButton 
+                    label="良好" 
+                    time={formatTime(schedules[2].interval)} 
+                    color="bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                    onClick={() => handleRate(3, schedules[2])}
+                    />
+                    <RatingButton 
+                    label="简单" 
+                    time={formatTime(schedules[3].interval)} 
+                    color="bg-sky-100 text-sky-700 hover:bg-sky-200"
+                    onClick={() => handleRate(4, schedules[3])}
+                    />
+                </div>
+                <button 
+                    onClick={handleSkip}
+                    className="w-full py-2 text-sm text-gray-400 font-medium hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <SkipForward size={14} />
+                    <span>暂不复习 (跳过)</span>
+                </button>
               </div>
             )}
           </div>

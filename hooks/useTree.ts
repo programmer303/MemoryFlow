@@ -1,7 +1,8 @@
 
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
-import { Node, NodeMap, Rating, TreeContextType } from '../types';
+import { Node, NodeMap, Rating, TreeContextType, FSRSReviewLog } from '../types';
 import { INITIAL_DATA } from '../utils/treeUtils';
+import { recalculateFSRS } from '../fsrs';
 
 // Context Definition
 export const TreeContext = createContext<TreeContextType | null>(null);
@@ -27,7 +28,15 @@ export function useTree() {
   const [nodes, setNodes] = useState<NodeMap>(() => {
     try {
       const saved = localStorage.getItem('memoryflow_data');
-      return saved ? JSON.parse(saved) : INITIAL_DATA;
+      if (saved) {
+         // Migration: Ensure logs array exists for old data
+         const parsed = JSON.parse(saved);
+         Object.keys(parsed).forEach(key => {
+            if (!parsed[key].logs) parsed[key].logs = [];
+         });
+         return parsed;
+      }
+      return INITIAL_DATA;
     } catch (e) {
       console.error("Failed to load data", e);
       return INITIAL_DATA;
@@ -43,6 +52,14 @@ export function useTree() {
   const addNode = useCallback((parentId: string, title: string, mode: 'store' | 'plan') => {
     const newId = crypto.randomUUID();
     const now = Date.now();
+    const dateObj = new Date(now);
+    
+    // Late night logic (00:00 - 03:00):
+    // If user adds content now, they consider it "Yesterday's" session.
+    // "Due Tomorrow" relative to "Yesterday" is "Today" (current physical date).
+    // Standard Time (03:00+): Due = Tomorrow (Now + 24h).
+    const isLateNight = dateObj.getHours() < 3;
+    const initialDue = isLateNight ? now : now + (24 * 60 * 60 * 1000);
     
     const newNode: Node = {
       id: newId,
@@ -54,9 +71,11 @@ export function useTree() {
         state: mode === 'plan' ? 'new' : 'suspended',
         s: 0,
         d: 0,
-        due: mode === 'plan' ? now + (24 * 60 * 60 * 1000) : 0, 
+        // If mode is plan, schedule based on logic above. If store, suspended (0).
+        due: mode === 'plan' ? initialDue : 0, 
         lastReview: 0 
-      }
+      },
+      logs: []
     };
 
     setNodes(prev => {
@@ -152,14 +171,29 @@ export function useTree() {
     });
   }, []);
 
+  // Standard Review (Today)
   const reviewComplete = useCallback((id: string, s: number, d: number, interval: number, rating: Rating) => {
     const now = Date.now();
+    
     setNodes(prev => {
       if (!prev[id]) return prev;
+      const node = prev[id];
+      
+      // Append new log
+      const newLog: FSRSReviewLog = {
+        id: crypto.randomUUID(),
+        rating,
+        reviewDate: now,
+        stateAfter: { s, d, interval }
+      };
+
+      const updatedLogs = [...(node.logs || []), newLog];
+
       return {
         ...prev,
         [id]: {
-          ...prev[id],
+          ...node,
+          logs: updatedLogs,
           fsrs: {
             state: 'review',
             s,
@@ -172,6 +206,62 @@ export function useTree() {
     });
   }, []);
 
+  // Retroactive Log (Past/Future insertion) -> Triggers Full Recalculation
+  const addRetroactiveLog = useCallback((id: string, rating: Rating, date: number) => {
+    setNodes(prev => {
+      if (!prev[id]) return prev;
+      const node = prev[id];
+      
+      // 1. Add new log
+      const newLog: FSRSReviewLog = {
+        id: crypto.randomUUID(),
+        rating,
+        reviewDate: date
+      };
+      
+      const updatedLogs = [...(node.logs || []), newLog];
+      
+      // 2. Strict Recalculation from History
+      const recalculatedState = recalculateFSRS(updatedLogs, node.fsrs.due);
+
+      return {
+        ...prev,
+        [id]: {
+          ...node,
+          logs: updatedLogs,
+          fsrs: recalculatedState
+        }
+      };
+    });
+  }, []);
+
+  const deleteLog = useCallback((nodeId: string, logId: string) => {
+      setNodes(prev => {
+          if (!prev[nodeId]) return prev;
+          const node = prev[nodeId];
+          const updatedLogs = node.logs.filter(l => l.id !== logId);
+          
+          const recalculatedState = recalculateFSRS(updatedLogs, Date.now()); // fallback due
+          
+          // If no logs left, maybe reset state to new?
+          if (updatedLogs.length === 0) {
+              recalculatedState.state = 'new';
+              recalculatedState.s = 0;
+              recalculatedState.d = 0;
+              recalculatedState.due = Date.now(); // Reset to due now
+          }
+
+          return {
+              ...prev,
+              [nodeId]: {
+                  ...node,
+                  logs: updatedLogs,
+                  fsrs: recalculatedState
+              }
+          };
+      });
+  }, []);
+
   return {
     nodes,
     addNode,
@@ -180,6 +270,8 @@ export function useTree() {
     toggleExpand,
     moveNode,
     reviewComplete,
+    addRetroactiveLog,
+    deleteLog,
     draggingId,
     setDraggingId
   };

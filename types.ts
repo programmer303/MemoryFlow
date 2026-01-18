@@ -11,6 +11,18 @@ export interface FSRSData {
   lastReview: number; // Timestamp
 }
 
+export interface FSRSReviewLog {
+  id: string; // Unique ID for the log entry
+  rating: Rating;
+  reviewDate: number; // Timestamp when review happened
+  // Snapshot of state AFTER this review (optional, but good for debugging)
+  stateAfter?: {
+    s: number;
+    d: number;
+    interval: number;
+  };
+}
+
 export interface Node {
   id: string;
   parentId: string | null;
@@ -18,17 +30,10 @@ export interface Node {
   children: string[]; // List of child IDs
   isExpanded: boolean;
   fsrs: FSRSData;
+  logs: FSRSReviewLog[]; // FULL HISTORY
 }
 
 export type NodeMap = Record<string, Node>;
-
-export interface FSRSReviewLog {
-  rating: Rating;
-  scheduledDays: number;
-  elapsedDays: number;
-  reviewTime: number;
-  state: NodeState;
-}
 
 export interface SchedulingInfo {
   s: number;
@@ -44,6 +49,8 @@ export interface TreeContextType {
   toggleExpand: (id: string) => void;
   moveNode: (sourceId: string, targetId: string, position: 'top' | 'bottom') => void;
   reviewComplete: (id: string, s: number, d: number, interval: number, rating: Rating) => void;
+  addRetroactiveLog: (id: string, rating: Rating, date: number) => void;
+  deleteLog: (nodeId: string, logId: string) => void;
   draggingId: string | null;
   setDraggingId: (id: string | null) => void;
 }

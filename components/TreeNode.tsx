@@ -1,22 +1,25 @@
 
 import React, { useState, useContext, useRef, useEffect } from 'react';
-import { Archive, ChevronDown, ChevronRight, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, GripVertical, Plus, Trash2, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { useTreeContext, TreeVisualContext } from '../hooks/useTree';
+import { HistoryModal } from './HistoryModal';
 
 export const NodeItem = React.memo(({ nodeId, isRoot }: { nodeId: string, isRoot?: boolean }) => {
-  const { nodes, toggleExpand, addNode, deleteNode, moveNode, draggingId, setDraggingId, updateNodeTitle } = useTreeContext();
+  const { nodes, toggleExpand, addNode, deleteNode, moveNode, draggingId, setDraggingId, updateNodeTitle, addRetroactiveLog, deleteLog } = useTreeContext();
   const visualState = useContext(TreeVisualContext);
   const node = nodes[nodeId];
   
-  const [isAdding, setIsAdding] = useState(false); // Legacy manual add via UI
+  const [isAdding, setIsAdding] = useState(false);
   const [localInput, setLocalInput] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
   const [dropPosition, setDropPosition] = useState<'top' | 'bottom' | null>(null);
   
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isSelected = visualState?.selectedId === nodeId;
   const isEditing = visualState?.editingId === nodeId;
+  const isSubject = node?.parentId === 'root';
 
   // Auto focus for inline editing
   useEffect(() => {
@@ -32,9 +35,11 @@ export const NodeItem = React.memo(({ nodeId, isRoot }: { nodeId: string, isRoot
   // Status Logic
   let statusBadge = null;
   let fsrsStats = null;
+  
+  // No status for subjects or suspended nodes unless we want to show it explicitly
   if (node.fsrs.state === 'suspended') {
     statusBadge = <span className="text-gray-300" title="已挂起"><Archive size={14} /></span>;
-  } else {
+  } else if (!isRoot && !isSubject) {
     const isDue = node.fsrs.due < Date.now();
     statusBadge = isDue 
       ? <span className="text-rose-500 text-[10px] font-bold bg-rose-50 px-1.5 py-0.5 rounded">到期</span>
@@ -135,6 +140,16 @@ export const NodeItem = React.memo(({ nodeId, isRoot }: { nodeId: string, isRoot
 
   return (
     <div className="pl-4">
+      {/* Modals */}
+      {showHistory && (
+         <HistoryModal 
+            node={node} 
+            onClose={() => setShowHistory(false)} 
+            onAddLog={(r, d) => addRetroactiveLog(nodeId, r, d)}
+            onDeleteLog={(logId) => deleteLog(nodeId, logId)}
+         />
+      )}
+
       <div 
         className={`relative rounded-md transition-all ${isBeingDragged ? 'opacity-30' : 'opacity-100'}`}
         onDragOver={handleDragOver}
@@ -210,7 +225,17 @@ export const NodeItem = React.memo(({ nodeId, isRoot }: { nodeId: string, isRoot
             <div className="opacity-100 ml-1">{statusBadge}</div>
           </div>
 
-          <div className="flex items-center gap-2 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => {
+                 e.stopPropagation();
+                 setShowHistory(true);
+              }}
+              className={`p-1 rounded ${isSelected ? 'text-indigo-400 hover:bg-indigo-200' : 'text-gray-400 hover:bg-gray-200'}`}
+              title="查看/补录复习历史"
+            >
+              <History size={14} />
+            </button>
             <button
               onClick={(e) => {
                  e.stopPropagation();
