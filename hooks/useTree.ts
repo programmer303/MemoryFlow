@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, createContext, useContext } from 'rea
 import { Node, NodeMap, Rating, TreeContextType, FSRSReviewLog } from '../types';
 import { INITIAL_DATA } from '../utils/treeUtils';
 import { recalculateFSRS } from '../fsrs';
+import { useCloudSync } from './useCloudSync';
 
 // Context Definition
 export const TreeContext = createContext<TreeContextType | null>(null);
@@ -25,11 +26,11 @@ export const useTreeContext = () => {
 
 // Hook Implementation
 export function useTree() {
+  // 1. Initialize Nodes
   const [nodes, setNodes] = useState<NodeMap>(() => {
     try {
       const saved = localStorage.getItem('memoryflow_data');
       if (saved) {
-         // Migration: Ensure logs array exists for old data
          const parsed = JSON.parse(saved);
          Object.keys(parsed).forEach(key => {
             if (!parsed[key].logs) parsed[key].logs = [];
@@ -43,10 +44,44 @@ export function useTree() {
     }
   });
 
+  // 2. Initialize Timestamp
+  const [lastModified, setLastModified] = useState<number>(() => {
+      try {
+          const savedTs = localStorage.getItem('memoryflow_timestamp');
+          return savedTs ? parseInt(savedTs, 10) : 0;
+      } catch {
+          return 0;
+      }
+  });
+
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
+  // 3. Cloud Sync Integration
+  // We pass a wrapped setter to useCloudSync to ensure we can update nodes from cloud
+  const { isSyncing } = useCloudSync(
+      nodes, 
+      setNodes, 
+      lastModified, 
+      (ts) => {
+          setLastModified(ts);
+          localStorage.setItem('memoryflow_timestamp', ts.toString());
+      }
+  );
+
+  // 4. Persistence Effect
+  // Whenever nodes change locally, we update localStorage and the timestamp.
   useEffect(() => {
     localStorage.setItem('memoryflow_data', JSON.stringify(nodes));
+    
+    // NOTE: This effect runs on EVERY node change.
+    // Ideally, we only update the timestamp if it's a "user action", 
+    // but differentiating that cleanly is hard. 
+    // We simply update the timestamp to NOW.
+    // useCloudSync handles the "isRemoteUpdate" check to avoid echo-loops.
+    const now = Date.now();
+    setLastModified(now);
+    localStorage.setItem('memoryflow_timestamp', now.toString());
+    
   }, [nodes]);
 
   const addNode = useCallback((parentId: string, title: string, mode: 'store' | 'plan') => {
@@ -55,9 +90,6 @@ export function useTree() {
     const dateObj = new Date(now);
     
     // Late night logic (00:00 - 03:00):
-    // If user adds content now, they consider it "Yesterday's" session.
-    // "Due Tomorrow" relative to "Yesterday" is "Today" (current physical date).
-    // Standard Time (03:00+): Due = Tomorrow (Now + 24h).
     const isLateNight = dateObj.getHours() < 3;
     const initialDue = isLateNight ? now : now + (24 * 60 * 60 * 1000);
     
@@ -71,7 +103,6 @@ export function useTree() {
         state: mode === 'plan' ? 'new' : 'suspended',
         s: 0,
         d: 0,
-        // If mode is plan, schedule based on logic above. If store, suspended (0).
         due: mode === 'plan' ? initialDue : 0, 
         lastReview: 0 
       },
@@ -179,7 +210,6 @@ export function useTree() {
       if (!prev[id]) return prev;
       const node = prev[id];
       
-      // Append new log
       const newLog: FSRSReviewLog = {
         id: crypto.randomUUID(),
         rating,
@@ -206,13 +236,12 @@ export function useTree() {
     });
   }, []);
 
-  // Retroactive Log (Past/Future insertion) -> Triggers Full Recalculation
+  // Retroactive Log
   const addRetroactiveLog = useCallback((id: string, rating: Rating, date: number) => {
     setNodes(prev => {
       if (!prev[id]) return prev;
       const node = prev[id];
       
-      // 1. Add new log
       const newLog: FSRSReviewLog = {
         id: crypto.randomUUID(),
         rating,
@@ -220,8 +249,6 @@ export function useTree() {
       };
       
       const updatedLogs = [...(node.logs || []), newLog];
-      
-      // 2. Strict Recalculation from History
       const recalculatedState = recalculateFSRS(updatedLogs, node.fsrs.due);
 
       return {
@@ -241,14 +268,13 @@ export function useTree() {
           const node = prev[nodeId];
           const updatedLogs = node.logs.filter(l => l.id !== logId);
           
-          const recalculatedState = recalculateFSRS(updatedLogs, Date.now()); // fallback due
+          const recalculatedState = recalculateFSRS(updatedLogs, Date.now()); 
           
-          // If no logs left, maybe reset state to new?
           if (updatedLogs.length === 0) {
               recalculatedState.state = 'new';
               recalculatedState.s = 0;
               recalculatedState.d = 0;
-              recalculatedState.due = Date.now(); // Reset to due now
+              recalculatedState.due = Date.now(); 
           }
 
           return {
@@ -273,6 +299,7 @@ export function useTree() {
     addRetroactiveLog,
     deleteLog,
     draggingId,
-    setDraggingId
+    setDraggingId,
+    isSyncing // Exposed for UI if needed
   };
 }

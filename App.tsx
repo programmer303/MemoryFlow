@@ -18,6 +18,7 @@ import { RecursiveTreeView } from './components/Tree';
 import { CalendarView } from './components/CalendarView';
 import { PrintPlanModal } from './components/PrintPlanModal';
 import { ReviewDeck } from './components/ReviewDeck';
+import { Login } from './components/Login';
 
 // ----------------------
 // MAIN COMPONENT
@@ -67,8 +68,11 @@ export default function App() {
 
   return (
     <TreeContext.Provider value={treeLogic}>
-      <div className="flex h-screen bg-gray-50 text-slate-800 font-sans">
+      <div className="flex h-screen bg-gray-50 text-slate-800 font-sans relative">
         
+        {/* Auth Floating Widget */}
+        <Login />
+
         {/* Modal Portal */}
         {showPrintModal && (
             <PrintPlanModal 
