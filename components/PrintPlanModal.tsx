@@ -1,8 +1,9 @@
 
-import React, { useMemo, useState } from 'react';
-import { X, Printer, BrainCircuit, Download, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, addDays, subDays, startOfDay, endOfDay, isSameDay, isToday, isTomorrow } from 'date-fns';
+import React, { useMemo, useState, useRef } from 'react';
+import { X, Printer, BrainCircuit, Download, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { format, addDays, endOfDay, isSameDay, isToday, isTomorrow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { toPng } from 'html-to-image';
 import { Node, NodeMap } from '../types';
 import { currentRetrievability } from '../fsrs';
 
@@ -19,6 +20,8 @@ interface PrioritizedItem {
 }
 
 export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
+  const printRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
   // Initialize targetDate based on the 3AM logic
   const [targetDate, setTargetDate] = useState<Date>(() => {
@@ -101,12 +104,67 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
     window.print();
   };
 
+  const handleExportImage = async () => {
+    if (printRef.current === null) return;
+    
+    try {
+        setIsGeneratingImage(true);
+        // Using a slightly larger pixel ratio for better quality
+        const dataUrl = await toPng(printRef.current, { 
+            cacheBust: true, 
+            backgroundColor: '#ffffff',
+            pixelRatio: 2 
+        });
+        
+        const link = document.createElement('a');
+        link.download = `MemoryFlow_Plan_${format(targetDate, 'yyyy-MM-dd')}.png`;
+        link.href = dataUrl;
+        link.click();
+    } catch (err) {
+        console.error('Failed to generate image', err);
+        alert('图片生成失败，请重试或使用打印功能。');
+    } finally {
+        setIsGeneratingImage(false);
+    }
+  };
+
   const subjectKeys = Object.keys(planData);
   const totalItems = Object.values(planData).reduce((acc: number, curr: PrioritizedItem[]) => acc + curr.length, 0);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0 print:bg-white print:static">
-      <div className="bg-gray-100 rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden print:h-auto print:shadow-none print:w-full print:max-w-none print:rounded-none">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0 print:bg-white print:static print:block">
+      {/* Strict Print Styles Injection */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-content, #printable-content * {
+            visibility: visible;
+          }
+          #printable-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            background: white;
+            box-shadow: none !important;
+          }
+          /* Ensure colors are printed */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          /* Hide scrollbars during print */
+          ::-webkit-scrollbar {
+            display: none;
+          }
+        }
+      `}</style>
+
+      <div className="bg-gray-100 rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden print:h-auto print:shadow-none print:w-full print:max-w-none print:rounded-none print:bg-white print:overflow-visible">
         
         {/* Toolbar (Hidden on Print) */}
         <div className="p-4 bg-white border-b border-gray-200 flex flex-col gap-4 print:hidden">
@@ -115,14 +173,22 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
                 <BrainCircuit className="text-indigo-600" />
                 <span className="font-bold">每日复习规划</span>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
+                <button 
+                    onClick={handleExportImage}
+                    disabled={isGeneratingImage}
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm disabled:opacity-50"
+                >
+                    {isGeneratingImage ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+                    保存图片
+                </button>
                 <button 
                     onClick={handlePrint}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-sm"
-                    title="在打印窗口中选择'另存为PDF'即可导出"
+                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-sm text-sm"
+                    title="使用浏览器打印功能，选择'另存为 PDF'"
                 >
-                    <Download size={18} />
-                    导出 PDF / 打印
+                    <Printer size={16} />
+                    打印 / PDF
                 </button>
                 <button 
                     onClick={onClose}
@@ -146,7 +212,7 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
                         key={date.toString()}
                         onClick={() => setTargetDate(date)}
                         className={`
-                            flex flex-col items-center justify-center min-w-[3rem] py-1.5 rounded-lg border text-xs transition-all
+                            flex flex-col items-center justify-center min-w-[3rem] py-1.5 rounded-lg border text-xs transition-all flex-shrink-0
                             ${isSelected 
                                 ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
                                 : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'}
@@ -163,8 +229,12 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
         </div>
 
         {/* Printable Paper Area */}
-        <div className="flex-1 overflow-y-auto p-8 print:overflow-visible print:p-0">
-           <div className="bg-white shadow-lg mx-auto max-w-[210mm] min-h-[297mm] p-[15mm] print:shadow-none print:max-w-none print:w-full print:min-h-0">
+        <div className="flex-1 overflow-y-auto p-8 print:overflow-visible print:p-0 bg-gray-100 print:bg-white">
+           <div 
+                id="printable-content"
+                ref={printRef}
+                className="bg-white shadow-lg mx-auto max-w-[210mm] min-h-[297mm] p-[15mm] print:shadow-none print:max-w-none print:w-full print:min-h-0 print:p-[10mm]"
+            >
                 
                 {/* Document Header */}
                 <div className="border-b-2 border-indigo-900 pb-4 mb-8 flex justify-between items-end">
@@ -199,7 +269,7 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
                         </span>
                     </div>
                     <div className="print:hidden text-[10px] text-gray-400">
-                        *导出提示：点击上方按钮，在打印设置中选择“另存为 PDF”
+                        * 使用“保存图片”或“打印 > 另存为 PDF”导出
                     </div>
                 </div>
 
@@ -232,12 +302,12 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
                                                 key={item.node.id} 
                                                 className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 text-sm print:py-1.5"
                                             >
-                                                <div className="flex items-center gap-3 flex-1 mr-4">
+                                                <div className="flex items-center gap-3 flex-1 mr-4 overflow-hidden">
                                                     <span className={`w-1.5 h-1.5 rounded-full ${dotColor} flex-shrink-0`}></span>
                                                     <span className="font-medium text-gray-800 truncate leading-tight">{item.node.title}</span>
                                                 </div>
                                                 
-                                                <div className="flex items-center">
+                                                <div className="flex items-center flex-shrink-0">
                                                     {/* Screen Only: Stats */}
                                                     <div className="hidden sm:flex print:hidden items-center gap-3 text-xs font-mono text-gray-400 mr-4">
                                                         <span title="难度">D:{item.node.fsrs.d.toFixed(1)}</span>
@@ -245,12 +315,12 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
                                                         <span title="保留率" className="font-bold text-gray-500">R:{(item.retrievability * 100).toFixed(0)}%</span>
                                                     </div>
 
-                                                    {/* Print Only: Rating Checkboxes */}
-                                                    <div className="flex items-center gap-1 print:gap-4 ml-auto">
+                                                    {/* Print & Preview: Rating Checkboxes */}
+                                                    <div className="flex items-center gap-2 ml-auto">
                                                         {['重来', '困难', '良好', '简单'].map((label, i) => (
                                                             <div key={label} className="flex flex-col items-center justify-center w-8">
-                                                                <div className="w-4 h-4 border border-gray-300 rounded-sm mb-0.5 bg-white"></div>
-                                                                <span className="text-[6px] text-gray-400 scale-75 origin-top hidden print:block">
+                                                                <div className="w-3.5 h-3.5 border border-gray-300 rounded-sm mb-1 bg-white shadow-sm"></div>
+                                                                <span className="text-[8px] text-gray-500 font-medium leading-none">
                                                                     {label}
                                                                 </span>
                                                             </div>
