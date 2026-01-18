@@ -269,7 +269,8 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
                         </span>
                     </div>
                     <div className="print:hidden text-[10px] text-gray-400">
-                        * 使用“保存图片”或“打印 > 另存为 PDF”导出
+                        * 使用“保存图片”或“打印 &gt; 另存为 PDF”导出
+
                     </div>
                 </div>
 
