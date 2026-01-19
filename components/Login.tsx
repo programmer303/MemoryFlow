@@ -136,7 +136,7 @@ export function Login({ mode = 'mobile' }: LoginProps) {
             <p className="text-sm text-gray-500 font-medium mb-8 text-center px-4 leading-relaxed h-10">
                {step === 'email' 
                   ? '登录 MemoryFlow 以同步您的记忆网络。' 
-                  : `已发送 6 位数验证码至 ${email}`
+                  : `已发送验证码至 ${email}`
                }
             </p>
 
@@ -191,11 +191,11 @@ export function Login({ mode = 'mobile' }: LoginProps) {
                             type="text"
                             value={otp}
                             onChange={(e) => {
-                                // Only allow numbers and max 6 chars
-                                const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                // Only allow numbers and max 8 chars
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 8);
                                 setOtp(val);
                             }}
-                            placeholder="000 000"
+                            placeholder="000000"
                             className="w-full h-14 bg-gray-100/80 hover:bg-gray-100 focus:bg-white border-none rounded-2xl outline-none text-2xl font-bold tracking-[0.2em] text-center transition-all text-gray-900 placeholder:text-gray-300 focus:ring-2 focus:ring-indigo-500/20 shadow-inner"
                             required
                             autoFocus
@@ -234,7 +234,7 @@ export function Login({ mode = 'mobile' }: LoginProps) {
 
             {step === 'email' && (
                 <p className="text-center text-[11px] text-gray-400 font-medium mt-6">
-                    我们将发送 6 位数字验证码至您的邮箱
+                    我们将发送验证码至您的邮箱
                 </p>
             )}
           </div>
