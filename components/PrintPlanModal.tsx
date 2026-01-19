@@ -1,15 +1,14 @@
 
 import React, { useMemo, useState, useRef } from 'react';
-import { X, Printer, BrainCircuit, Download, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Printer, BrainCircuit, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { format, addDays, endOfDay, isSameDay, isToday, isTomorrow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { toPng } from 'html-to-image';
 import { Node, NodeMap } from '../types';
 import { currentRetrievability } from '../fsrs';
 
-interface PrintPlanModalProps {
+interface PrintPlanViewProps {
   nodes: NodeMap;
-  onClose: () => void;
 }
 
 interface PrioritizedItem {
@@ -19,7 +18,7 @@ interface PrioritizedItem {
   priorityScore: number;
 }
 
-export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
+export function PrintPlanView({ nodes }: PrintPlanViewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
@@ -132,7 +131,7 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
   const totalItems = Object.values(planData).reduce((acc: number, curr: PrioritizedItem[]) => acc + curr.length, 0);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0 print:bg-white print:static print:block">
+    <div className="flex flex-col h-full bg-gray-50">
       {/* Strict Print Styles Injection */}
       <style>{`
         @media print {
@@ -164,72 +163,65 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
         }
       `}</style>
 
-      <div className="bg-gray-100 rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden print:h-auto print:shadow-none print:w-full print:max-w-none print:rounded-none print:bg-white print:overflow-visible">
-        
-        {/* Toolbar (Hidden on Print) */}
-        <div className="p-4 bg-white border-b border-gray-200 flex flex-col gap-4 print:hidden">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2 text-gray-700">
-                <BrainCircuit className="text-indigo-600" />
-                <span className="font-bold">每日复习规划</span>
-            </div>
-            <div className="flex gap-2">
-                <button 
-                    onClick={handleExportImage}
-                    disabled={isGeneratingImage}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm disabled:opacity-50"
-                >
-                    {isGeneratingImage ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-                    保存图片
-                </button>
-                <button 
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-sm text-sm"
-                    title="使用浏览器打印功能，选择'另存为 PDF'"
-                >
-                    <Printer size={16} />
-                    打印 / PDF
-                </button>
-                <button 
-                    onClick={onClose}
-                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
-                >
-                    <X size={20} />
-                </button>
-            </div>
-          </div>
+      {/* Header / Toolbar (Hidden on Print) */}
+      <div className="flex-shrink-0 h-16 border-b border-gray-200 flex items-center justify-between px-4 md:px-8 bg-white sticky top-0 z-10 print:hidden">
+         <div className="flex items-center gap-2 text-gray-800">
+             <BrainCircuit className="text-indigo-600" size={24} />
+             <h2 className="text-xl font-bold whitespace-nowrap">每日计划</h2>
+         </div>
 
-          {/* Date Selector Strip */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-             {availableDates.map(date => {
-                 const isSelected = isSameDay(date, targetDate);
-                 let label = format(date, 'd');
-                 if (isToday(date)) label = '今天';
-                 if (isTomorrow(date)) label = '明天';
-                 
-                 return (
-                     <button
-                        key={date.toString()}
-                        onClick={() => setTargetDate(date)}
-                        className={`
-                            flex flex-col items-center justify-center min-w-[3rem] py-1.5 rounded-lg border text-xs transition-all flex-shrink-0
-                            ${isSelected 
-                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
-                                : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'}
-                        `}
-                     >
-                        <span className="font-bold">{label}</span>
-                        <span className={`text-[10px] ${isSelected ? 'text-indigo-100' : 'text-gray-400'}`}>
-                            {format(date, 'EEE', { locale: zhCN })}
-                        </span>
-                     </button>
-                 )
-             })}
-          </div>
-        </div>
+         {/* Date Selector Strip */}
+         <div className="flex-1 max-w-xl mx-4 overflow-x-auto pb-1 scrollbar-thin flex justify-center">
+             <div className="flex items-center gap-2">
+                {availableDates.map(date => {
+                    const isSelected = isSameDay(date, targetDate);
+                    let label = format(date, 'd');
+                    if (isToday(date)) label = '今天';
+                    if (isTomorrow(date)) label = '明天';
+                    
+                    return (
+                        <button
+                           key={date.toString()}
+                           onClick={() => setTargetDate(date)}
+                           className={`
+                               flex flex-col items-center justify-center min-w-[3rem] py-1 px-2 rounded-lg border text-xs transition-all flex-shrink-0
+                               ${isSelected 
+                                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
+                                   : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'}
+                           `}
+                        >
+                           <span className="font-bold whitespace-nowrap">{label}</span>
+                           <span className={`text-[10px] whitespace-nowrap ${isSelected ? 'text-indigo-100' : 'text-gray-400'}`}>
+                               {format(date, 'EEE', { locale: zhCN })}
+                           </span>
+                        </button>
+                    )
+                })}
+             </div>
+         </div>
 
-        {/* Printable Paper Area */}
-        <div className="flex-1 overflow-y-auto p-8 print:overflow-visible print:p-0 bg-gray-100 print:bg-white">
+         <div className="flex gap-2">
+             <button 
+                 onClick={handleExportImage}
+                 disabled={isGeneratingImage}
+                 className="hidden sm:flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm disabled:opacity-50 whitespace-nowrap"
+             >
+                 {isGeneratingImage ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+                 <span>保存图片</span>
+             </button>
+             <button 
+                 onClick={handlePrint}
+                 className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-sm text-sm whitespace-nowrap"
+                 title="使用浏览器打印功能，选择'另存为 PDF'"
+             >
+                 <Printer size={16} />
+                 <span>打印 / PDF</span>
+             </button>
+         </div>
+      </div>
+
+      {/* Main Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50 print:bg-white print:p-0 print:overflow-visible custom-scrollbar">
            <div 
                 id="printable-content"
                 ref={printRef}
@@ -269,8 +261,7 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
                         </span>
                     </div>
                     <div className="print:hidden text-[10px] text-gray-400">
-                        * 使用“保存图片”或“打印 &gt; 另存为 PDF”导出
-
+                        * 使用上方按钮导出 PDF 或图片
                     </div>
                 </div>
 
@@ -342,9 +333,7 @@ export function PrintPlanModal({ nodes, onClose }: PrintPlanModalProps) {
                      <span>Generated by MemoryFlow</span>
                      <span>Keep flowing, keep growing.</span>
                 </div>
-
            </div>
-        </div>
       </div>
     </div>
   );

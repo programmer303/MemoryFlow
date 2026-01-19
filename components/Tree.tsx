@@ -36,19 +36,14 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
       // 1. Handle actions while editing
       if (editingId) {
         if (e.key === 'Enter') {
-           // Enter -> Just Exit Edit Mode (Commit changes)
            e.preventDefault();
            setEditingId(null);
            return;
         } else if (e.key === 'Tab') {
-           // Tab -> Add Child (Commit edit & create new child)
            e.preventDefault();
            setEditingId(null);
-
            if (selectedId) {
              const newId = addNode(selectedId, "新节点", 'plan');
-             // NOTE: addNode already sets isExpanded=true on parent. 
-             // Do NOT call toggleExpand here, or it might flip it back to false due to state batching.
              setSelectedId(newId);
              setEditingId(newId);
            }
@@ -57,11 +52,9 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
            setEditingId(null);
            return;
         }
-        // While editing, ignore other navigation keys (Arrows, etc.)
         return;
       }
 
-      // 2. Ignore shortcuts if focused on Toolbar input
       if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) {
         return;
       }
@@ -138,7 +131,6 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
           break;
 
         case 'Enter': 
-          // Enter -> Add Sibling (Only when NOT editing)
           e.preventDefault();
           if (current && current.parentId) {
              const newId = addNode(current.parentId, "新节点", 'plan');
@@ -148,11 +140,9 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
           break;
           
         case 'Tab': 
-          // Tab -> Add Child
           e.preventDefault();
           if (selectedId) {
              const newId = addNode(selectedId, "新节点", 'plan');
-             // NOTE: addNode ensures parent is expanded. No toggle needed.
              setSelectedId(newId);
              setEditingId(newId);
           }
@@ -184,16 +174,18 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
 
   return (
     <TreeVisualContext.Provider value={{ selectedId, setSelectedId, editingId, setEditingId }}>
-        <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="flex-shrink-0 h-16 border-b border-gray-200 flex items-center justify-between px-4 md:px-8 bg-white/80 backdrop-blur sticky top-0 z-10">
+        {/* Full height flex container */}
+        <div className="flex flex-col h-full bg-white">
+        
+        {/* Sticky Toolbar Header */}
+        <div className="flex-shrink-0 h-14 border-b border-gray-100 flex items-center justify-between px-4 sticky top-0 bg-white/95 backdrop-blur z-20">
             {onSubjectChange && rootSubjects.length > 0 ? (
                 // Mobile / Switcher Mode
-                <div className="relative">
+                <div className="relative min-w-0 flex-1 mr-4">
                     <select 
                         value={rootId}
                         onChange={(e) => onSubjectChange(e.target.value)}
-                        className="appearance-none bg-transparent text-lg md:text-xl font-bold text-gray-800 pr-8 py-1 outline-none cursor-pointer"
+                        className="appearance-none bg-transparent text-lg font-bold text-gray-800 pr-8 py-1 outline-none cursor-pointer w-full truncate"
                     >
                         {rootSubjects.map(sub => (
                             <option key={sub.id} value={sub.id}>
@@ -205,35 +197,36 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
                 </div>
             ) : (
                 // Desktop / Static Mode
-                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <span className="text-indigo-500">#</span> {rootNode.title}
+                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-indigo-500 shrink-0">#</span> 
+                    <span className="truncate">{rootNode.title}</span>
                 </h2>
             )}
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
             <button
                 onClick={() => setViewMode('list')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 viewMode === 'list' 
                     ? 'bg-indigo-50 text-indigo-600' 
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+                    : 'text-gray-500 hover:bg-gray-100'
                 }`}
                 title="列表视图"
             >
-                <LayoutList size={18} />
-                <span className="hidden sm:inline">列表</span>
+                <LayoutList size={16} />
+                <span className="hidden sm:inline whitespace-nowrap">列表</span>
             </button>
             <button
                 onClick={() => setViewMode('map')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 viewMode === 'map' 
                     ? 'bg-indigo-50 text-indigo-600' 
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+                    : 'text-gray-500 hover:bg-gray-100'
                 }`}
                 title="思维导图视图"
             >
-                <GitGraph size={18} />
-                <span className="hidden sm:inline">导图</span>
+                <GitGraph size={16} />
+                <span className="hidden sm:inline whitespace-nowrap">导图</span>
             </button>
             </div>
         </div>
@@ -241,7 +234,7 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
         {/* Content Area */}
         {viewMode === 'list' ? (
             <div 
-                className="flex-1 overflow-y-auto px-4 md:px-6 py-6 outline-none pb-24 md:pb-6" 
+                className="flex-1 overflow-y-auto px-2 md:px-6 py-4 outline-none custom-scrollbar" 
                 tabIndex={0}
                 onClick={() => {}}
             >
@@ -249,22 +242,23 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
                 nodeId={rootId} 
                 isRoot={true}
             />
+            {/* Bottom padding for mobile fab/actions */}
+            <div className="h-20 md:h-0"></div>
             </div>
         ) : (
-            <div className="flex-1 overflow-auto bg-slate-50 relative cursor-grab active:cursor-grabbing outline-none pb-24 md:pb-0" tabIndex={0}>
+            <div className="flex-1 overflow-auto bg-slate-50 relative cursor-grab active:cursor-grabbing outline-none" tabIndex={0}>
                 {/* Keyboard Hints */}
                 <div className="absolute top-4 left-4 z-20 pointer-events-none opacity-40 hover:opacity-100 transition-opacity text-[10px] text-gray-500 space-y-1 bg-white/50 p-2 rounded backdrop-blur-sm hidden md:block">
                     <p><kbd className="bg-white border rounded px-1 shadow-sm font-mono">Tab</kbd> 添加子节点</p>
                     <p><kbd className="bg-white border rounded px-1 shadow-sm font-mono">Enter</kbd> 添加兄弟节点</p>
-                    <p><kbd className="bg-white border rounded px-1 shadow-sm font-mono">Space</kbd> 编辑名称</p>
-                    <p><kbd className="bg-white border rounded px-1 shadow-sm font-mono">Arrows</kbd> 切换选中</p>
                 </div>
                 <div className="min-w-max min-h-full p-20 flex items-center justify-start">
-                <MindMapNode nodeId={rootId} isRoot />
+                   <MindMapNode nodeId={rootId} isRoot />
                 </div>
             </div>
         )}
 
+        {/* Bottom Input Toolbar */}
         <Toolbar 
             rootTitle={rootNode.title}
             inputValue={inputValue}
@@ -283,13 +277,9 @@ export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeView
 const getNextVisibleId = (currentId: string, nodes: NodeMap, rootId: string): string | null => {
   const node = nodes[currentId];
   if (!node) return null;
-
-  // 1. If expanded and has children, first child is next
   if (node.isExpanded && node.children.length > 0) {
     return node.children[0];
   }
-
-  // 2. Else, try next sibling. If no next sibling, go up recursively
   let curr = node;
   while (curr.id !== rootId && curr.parentId) {
     const parent = nodes[curr.parentId];
@@ -297,7 +287,6 @@ const getNextVisibleId = (currentId: string, nodes: NodeMap, rootId: string): st
     if (idx !== -1 && idx < parent.children.length - 1) {
       return parent.children[idx + 1];
     }
-    // No next sibling, move up
     curr = parent;
   }
   return null;
@@ -311,12 +300,10 @@ const getPrevVisibleId = (currentId: string, nodes: NodeMap, rootId: string): st
     const parent = nodes[node.parentId];
     const idx = parent.children.indexOf(currentId);
   
-    // 1. If first child, go to parent
     if (idx === 0) {
       return parent.id;
     }
   
-    // 2. Go to previous sibling's deepest expanded visible descendant
     let curr = nodes[parent.children[idx - 1]];
     while (curr.isExpanded && curr.children.length > 0) {
       curr = nodes[curr.children[curr.children.length - 1]];
@@ -359,7 +346,6 @@ const MindMapNode: React.FC<MindMapNodeProps> = ({ nodeId, isRoot = false, index
   const isLast = index === total - 1;
   const isOnly = total === 1;
 
-  // Status Styles
   let statusClasses = "border-gray-200 bg-white text-slate-700";
   if (node.fsrs.state === 'suspended') statusClasses = "border-dashed border-gray-300 bg-gray-50 text-gray-400";
   else if (node.fsrs.due < Date.now()) statusClasses = "border-rose-200 bg-rose-50 text-rose-900 font-medium";
@@ -367,7 +353,6 @@ const MindMapNode: React.FC<MindMapNodeProps> = ({ nodeId, isRoot = false, index
   
   if (isRoot) statusClasses = "border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-200";
 
-  // Selection Overlay
   const selectionClass = isSelected 
     ? "ring-2 ring-indigo-500 ring-offset-2 z-20 shadow-md scale-[1.02]" 
     : "hover:border-indigo-300 hover:shadow-sm";
@@ -408,7 +393,6 @@ const MindMapNode: React.FC<MindMapNodeProps> = ({ nodeId, isRoot = false, index
             onChange={(e) => updateNodeTitle(nodeId, e.target.value)}
             onBlur={handleFinishEdit}
             onClick={(e) => e.stopPropagation()}
-            // Note: Enter/Tab handling bubbles to global window listener
           />
         ) : (
           <span className="whitespace-nowrap text-sm">{node.title}</span>
