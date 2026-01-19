@@ -1,12 +1,17 @@
 
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { LayoutList, GitGraph } from 'lucide-react';
+import { LayoutList, GitGraph, ChevronDown } from 'lucide-react';
 import { useTreeContext, TreeVisualContext } from '../hooks/useTree';
 import { NodeItem } from './TreeNode';
 import { Toolbar } from './Toolbar';
 import { NodeMap } from '../types';
 
-export function RecursiveTreeView({ rootId }: { rootId: string }) {
+interface RecursiveTreeViewProps {
+  rootId: string;
+  onSubjectChange?: (id: string) => void;
+}
+
+export function RecursiveTreeView({ rootId, onSubjectChange }: RecursiveTreeViewProps) {
   const { nodes, addNode, toggleExpand, updateNodeTitle } = useTreeContext();
   const rootNode = nodes[rootId];
   const [inputValue, setInputValue] = useState("");
@@ -175,14 +180,35 @@ export function RecursiveTreeView({ rootId }: { rootId: string }) {
     setInputValue("");
   };
 
+  const rootSubjects = nodes['root']?.children.map(id => nodes[id]) || [];
+
   return (
     <TreeVisualContext.Provider value={{ selectedId, setSelectedId, editingId, setEditingId }}>
         <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="flex-shrink-0 h-16 border-b border-gray-200 flex items-center justify-between px-8 bg-white/80 backdrop-blur sticky top-0 z-10">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <span className="text-indigo-500">#</span> {rootNode.title}
-            </h2>
+        <div className="flex-shrink-0 h-16 border-b border-gray-200 flex items-center justify-between px-4 md:px-8 bg-white/80 backdrop-blur sticky top-0 z-10">
+            {onSubjectChange && rootSubjects.length > 0 ? (
+                // Mobile / Switcher Mode
+                <div className="relative">
+                    <select 
+                        value={rootId}
+                        onChange={(e) => onSubjectChange(e.target.value)}
+                        className="appearance-none bg-transparent text-lg md:text-xl font-bold text-gray-800 pr-8 py-1 outline-none cursor-pointer"
+                    >
+                        {rootSubjects.map(sub => (
+                            <option key={sub.id} value={sub.id}>
+                                # {sub.title}
+                            </option>
+                        ))}
+                    </select>
+                    <ChevronDown size={16} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+            ) : (
+                // Desktop / Static Mode
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <span className="text-indigo-500">#</span> {rootNode.title}
+                </h2>
+            )}
 
             <div className="flex items-center gap-1">
             <button
@@ -195,7 +221,7 @@ export function RecursiveTreeView({ rootId }: { rootId: string }) {
                 title="列表视图"
             >
                 <LayoutList size={18} />
-                <span>列表</span>
+                <span className="hidden sm:inline">列表</span>
             </button>
             <button
                 onClick={() => setViewMode('map')}
@@ -207,7 +233,7 @@ export function RecursiveTreeView({ rootId }: { rootId: string }) {
                 title="思维导图视图"
             >
                 <GitGraph size={18} />
-                <span>导图</span>
+                <span className="hidden sm:inline">导图</span>
             </button>
             </div>
         </div>
@@ -215,7 +241,7 @@ export function RecursiveTreeView({ rootId }: { rootId: string }) {
         {/* Content Area */}
         {viewMode === 'list' ? (
             <div 
-                className="flex-1 overflow-y-auto px-6 py-6 outline-none" 
+                className="flex-1 overflow-y-auto px-4 md:px-6 py-6 outline-none pb-24 md:pb-6" 
                 tabIndex={0}
                 onClick={() => {}}
             >
@@ -225,9 +251,9 @@ export function RecursiveTreeView({ rootId }: { rootId: string }) {
             />
             </div>
         ) : (
-            <div className="flex-1 overflow-auto bg-slate-50 relative cursor-grab active:cursor-grabbing outline-none" tabIndex={0}>
+            <div className="flex-1 overflow-auto bg-slate-50 relative cursor-grab active:cursor-grabbing outline-none pb-24 md:pb-0" tabIndex={0}>
                 {/* Keyboard Hints */}
-                <div className="absolute top-4 left-4 z-20 pointer-events-none opacity-40 hover:opacity-100 transition-opacity text-[10px] text-gray-500 space-y-1 bg-white/50 p-2 rounded backdrop-blur-sm">
+                <div className="absolute top-4 left-4 z-20 pointer-events-none opacity-40 hover:opacity-100 transition-opacity text-[10px] text-gray-500 space-y-1 bg-white/50 p-2 rounded backdrop-blur-sm hidden md:block">
                     <p><kbd className="bg-white border rounded px-1 shadow-sm font-mono">Tab</kbd> 添加子节点</p>
                     <p><kbd className="bg-white border rounded px-1 shadow-sm font-mono">Enter</kbd> 添加兄弟节点</p>
                     <p><kbd className="bg-white border rounded px-1 shadow-sm font-mono">Space</kbd> 编辑名称</p>
